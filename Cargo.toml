@@ -1,0 +1,15 @@
+[package]
+name = "chipy8"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+overflow-checks = false
+
+[dependencies]
+color-eyre = "0.6.3"
+crossterm = "0.28.1"
+drawille = "0.3.0"
+rand = "0.8.5"
+ratatui = "0.28.1"
+

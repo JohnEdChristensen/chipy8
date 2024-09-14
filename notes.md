@@ -1,0 +1,123 @@
+6A 02  LD VA 0x02 paddle 1 x
+6B 0C  LD VB 0x0C paddle 1 y
+6C 3F  LD VC 0x3F paddle 2 x
+6D 0C  LD VC 0x0C paddle 2 y
+A2 EA  Str I 2EA ( 6 row, vertical line column 0)
+DA B6  Draw 6,VA,VB 
+DC D6  Draw 6,VC,VD
+6E 00  LD VE 00
+22 D4  SUB 2D4 -- SUB 1 (line 107)
+66 03  LD V6 03
+68 02  LD V8 02
+60 60  LD V0 60
+F0 15  DELAY V0
+F0 07  STO DELAY V0 --21A
+30 00  Skip if V0==0
+12 1A  JUMP 21A        ^
+C7 17  Random V7 masked by 17
+77 08  Add V7 08
+69 FF  LD V9 FF
+A2 F0  LD I 2F0 -- 8000
+D6 71  Draw 1 line, V6,V7  draw a dot 
+A2 EA  LD I 2EA -- 8080
+DA B6  Draw VA,VB 6 lines
+DC D6
+60 01
+E0 A1
+7B FE
+60 04
+E0 A1
+7B 02
+60 1F
+8B 02
+DA B6
+60 0C
+E0 A1
+7D FE
+60 0D
+E0 A1
+7D 02
+60 1F
+8D 02
+DC D6
+A2 F0
+D6 71
+86 84
+87 94
+60 3F
+86 02
+61 1F
+87 12
+46 02
+12 78
+46 3F
+12 82
+47 1F
+69 FF
+47 00
+69 01
+D6 71
+12 2A
+68 02
+63 01
+80 70
+80 B5
+12 8A
+68 FE
+63 0A
+80 70
+80 D5
+3F 01
+12 A2
+61 02
+80 15
+3F 01
+12 BA
+80 15
+3F 01
+12 C8
+80 15
+3F 01
+12 C2
+60 20
+F0 18
+22 D4
+8E 34
+22 D4
+66 3E
+33 01
+66 03
+68 FE
+33 01
+68 02
+12 16
+79 FF
+49 FE
+69 FF
+12 C8
+79 01
+49 02
+69 01
+60 04
+F0 18
+76 01
+46 40
+76 FE
+12 6C
+A2 F2  STO I 2F2-- SUB_1
+FE 33  BCD E (starts at 0)
+F2 65  LOAD REGISTERS 0 1 2 FROM I
+F1 29  Load sprite V1
+64 14  LD V4 14 
+65 00  LD V5 00 
+D4 55  Draw 5 lines, V4,V5
+74 15  Add V4 15
+F2 29  load sprite V2
+D4 55  Draw 5 lines, V4,V5
+00 EE  Return from subroutine -- line 9
+80 80
+80 80
+80 80
+80 00
+00 00
+00 00
