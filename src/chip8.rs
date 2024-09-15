@@ -11,13 +11,36 @@ pub const HEIGHT_PIX: usize = 32;
 const WIDTH_BYTE: usize = 8;
 const HEIGHT_BYTE: usize = 32;
 
+/// characters 0..f
+/// 5 row tall, 8 pixles wide 
+#[rustfmt::skip]
+const CHARACTERS:[u8;5*16] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, //0
+    0x20, 0x60, 0x20, 0x20, 0x70, //1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, //2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, //3
+    0x90, 0x90, 0xF0, 0x10, 0x10, //4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, //5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, //6
+    0xF0, 0x10, 0x20, 0x40, 0x40, //7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, //8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, //9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, //a
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, //b
+    0xF0, 0x80, 0x80, 0x80, 0xF0, //c
+    0xE0, 0x90, 0x90, 0x90, 0xE0, //d
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, //e
+    0xF0, 0x80, 0xF0, 0x80, 0x80, //f
+];
+
+/// Chip 8 emulator state
 #[derive(Clone, PartialEq)]
 pub struct Chip8 {
     memory: [u8; MEMORY_SIZE],
     registers: [u8; 16],
     /// register for storing memory addresses
     i: u16,
-    input: u8,
+    pub input: u8,
     /// these two registers are auto decremented at 60hz
     delay: u8,
     sound: u8,
@@ -32,50 +55,20 @@ pub struct Chip8 {
 }
 
 impl Chip8 {
-    pub fn new(path: String) -> Chip8 {
+    ///
+    pub fn new(rom_location: &str) -> Chip8 {
         let mut memory: [u8; MEMORY_SIZE] = [0; MEMORY_SIZE];
-        println!("Reading ROM: {}", path);
 
-        let rom = read(path).unwrap();
+        println!("Reading ROM: {}", rom_location);
+
+        let rom = match read(rom_location) {
+            Ok(rom) => rom,
+            Err(_) => [].to_vec(),
+        };
         let rom: &[u8] = rom.as_slice();
         memory[PROGRAM_START..PROGRAM_START + rom.len()].copy_from_slice(rom);
 
-        #[rustfmt::skip]
-        let characters = [
-            //0
-            0xF0, 0x90, 0x90, 0x90, 0xF0,
-            //1
-            0x20, 0x60, 0x20, 0x20, 0x70,
-            //2
-            0xF0, 0x10, 0xF0, 0x80, 0xF0,
-            //3
-            0xF0, 0x10, 0xF0, 0x10, 0xF0,
-            //4
-            0x90, 0x90, 0xF0, 0x10, 0x10,
-            //5
-            0xF0, 0x80, 0xF0, 0x10, 0xF0,
-            //6
-            0xF0, 0x80, 0xF0, 0x90, 0xF0,
-            //7
-            0xF0, 0x10, 0x20, 0x40, 0x40,
-            //8
-            0xF0, 0x90, 0xF0, 0x90, 0xF0,
-            //9
-            0xF0, 0x90, 0xF0, 0x10, 0xF0,
-            //A
-            0xF0, 0x90, 0xF0, 0x90, 0x90,
-            //B
-            0xE0, 0x90, 0xE0, 0x90, 0xE0,
-            //C
-            0xF0, 0x80, 0x80, 0x80, 0xF0,
-            //D
-            0xE0, 0x90, 0x90, 0x90, 0xE0,
-            //E
-            0xF0, 0x80, 0xF0, 0x80, 0xF0,
-            //F
-            0xF0, 0x80, 0xF0, 0x80, 0x80,
-        ];
-        memory[0..characters.len()].copy_from_slice(&characters);
+        memory[0..CHARACTERS.len()].copy_from_slice(&CHARACTERS);
 
         Chip8 {
             memory,
@@ -94,6 +87,13 @@ impl Chip8 {
     fn set_addr(&mut self, a1: u8, a2: u8, a3: u8) {
         self.program_counter = assemble_addr(a1, a2, a3) - 2;
     }
+
+    #[allow(dead_code)]
+    fn set_memory(&mut self, start_location: u16, data: Vec<u8>) {
+        self.memory[start_location as usize..start_location as usize + data.len() as usize]
+            .copy_from_slice(&data);
+    }
+
     pub fn step(&mut self) -> &mut Chip8 {
         let byte_1 = self.memory[self.program_counter as usize];
         let n1 = (byte_1 & 0xF0) >> 4;
@@ -258,6 +258,7 @@ impl Chip8 {
         if self.sound > 0 {
             self.sound -= 1;
         }
+        //self.input = 0;
         self
     }
 }
@@ -269,45 +270,57 @@ fn assemble_addr(a1: u8, a2: u8, a3: u8) -> u16 {
 
 #[test]
 fn cls() {
-    let mut state = Chip8::new();
+    let mut state = Chip8::new("");
     let mut expected_state = state.clone();
     state.display.fill(1);
 
     assert_ne!(state, expected_state);
-    state = step(state, 0x00, 0x00, 0x0E, 0x00);
+    state.set_memory(state.program_counter, vec![0x00, 0x00, 0x0E, 0x00]);
+    state.step();
     expected_state.program_counter += 2;
 
     assert_eq!(state, expected_state)
 }
 #[test]
 fn ret() {
-    let mut state = Chip8::new();
+    let mut state = Chip8::new("");
     state.stack_pointer = 3;
     state.stack[3] = 0xF0;
     state.stack[2] = 0xF1;
     state.stack[1] = 0xF2;
     state.stack[0] = 0xF3;
+    #[rustfmt::skip]
+    state.set_memory(
+        state.program_counter,
+        vec![
+            0x00, 0x00, 0x0E, 0x0E,
+            0x00, 0x00, 0x0E, 0x0E,
+            0x00, 0x00, 0x0E, 0x0E,
+            0x00, 0x00, 0x0E, 0x0E,
+            0x00, 0x00, 0x0E, 0x0E,
+        ],
+    );
     let mut expected_state = state.clone();
 
-    state = step(state, 0x00, 0x00, 0x0E, 0x0E);
+    state.step();
     expected_state.stack_pointer = 2;
     expected_state.program_counter = 0xF0 + 2;
 
     assert_eq!(state, expected_state);
 
-    state = step(state, 0x00, 0x00, 0x0E, 0x0E);
+    state.step();
     expected_state.stack_pointer = 1;
     expected_state.program_counter = 0xF1 + 2;
 
     assert_eq!(state, expected_state);
 
-    state = step(state, 0x00, 0x00, 0x0E, 0x0E);
+    state.step();
     expected_state.stack_pointer = 0;
     expected_state.program_counter = 0xF2 + 2;
 
     assert_eq!(state, expected_state);
 
-    state = step(state, 0x00, 0x00, 0x0E, 0x0E);
+    state.step();
     expected_state.stack_pointer = 0xFF;
     expected_state.program_counter = 0xF3 + 2;
 
@@ -316,10 +329,9 @@ fn ret() {
 
 #[test]
 fn jump() {
-    let mut state = Chip8::new();
+    let mut state = Chip8::new("".into());
+    state.set_memory(state.program_counter, vec![0x01, 0x01, 0x02, 0x03]);
     let mut expected_state = state.clone();
-
-    state = step(state, 0x01, 0x01, 0x02, 0x03);
 
     expected_state.program_counter = 0x0123 + 2;
     assert_eq!(state, expected_state);

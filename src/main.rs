@@ -1,18 +1,3 @@
-//! # [Ratatui] Canvas example
-//!
-//! The latest version of this example is available in the [examples] folder in the repository.
-//!
-//! Please note that the examples are designed to be run against the `main` branch of the Github
-//! repository. This means that you may not be able to compile with the latest release version on
-//! crates.io, or the one that you have installed locally.
-//!
-//! See the [examples readme] for more information on finding examples that match the version of the
-//! library you are using.
-//!
-//! [Ratatui]: https://github.com/ratatui/ratatui
-//! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
-//! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
-
 use std::{
     env::args,
     time::{Duration, Instant},
@@ -20,18 +5,21 @@ use std::{
 
 use chip8::{Chip8, WIDTH_PIX};
 use color_eyre::Result;
+use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
-    crossterm::event::{self, Event, KeyCode},
-    layout::{Constraint, Layout},
-    style::Color,
-    symbols::Marker,
+    prelude::*,
     widgets::{
         canvas::{Canvas, Shape},
-        Block, Borders, Paragraph, Widget,
+        Block, Borders, Paragraph,
     },
-    DefaultTerminal, Frame,
+    DefaultTerminal,
 };
+use symbols::Marker;
+use widget::HexInput;
+
 mod chip8;
+mod widget;
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     let terminal = ratatui::init();
@@ -49,15 +37,15 @@ impl App {
     fn new() -> Self {
         let mut cli_params = args();
         let _ = cli_params.next();
-        let path = cli_params.next().unwrap();
+        let path = cli_params.next().unwrap_or("./ROMS/INVADERS".to_string());
         Self {
-            chip8: Chip8::new(path),
+            chip8: Chip8::new(&path),
             tick_count: 0,
         }
     }
 
     pub fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
-        let tick_rate = Duration::from_millis(16);
+        let tick_rate = Duration::from_millis(4);
         let mut last_tick = Instant::now();
         loop {
             terminal.draw(|frame| self.draw(frame))?;
@@ -65,11 +53,23 @@ impl App {
             if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     match key.code {
-                        KeyCode::Char('q') => break Ok(()),
-                        //KeyCode::Down | KeyCode::Char('j') => self.y += 1.0,
-                        //KeyCode::Up | KeyCode::Char('k') => self.y -= 1.0,
-                        //KeyCode::Right | KeyCode::Char('l') => self.x += 1.0,
-                        //KeyCode::Left | KeyCode::Char('h') => self.x -= 1.0,
+                        KeyCode::Esc => break Ok(()),
+                        KeyCode::Char('1') => self.chip8.input = 0,
+                        KeyCode::Char('2') => self.chip8.input = 1,
+                        KeyCode::Char('3') => self.chip8.input = 2,
+                        KeyCode::Char('4') => self.chip8.input = 3,
+                        KeyCode::Char('q') => self.chip8.input = 4,
+                        KeyCode::Char('w') => self.chip8.input = 5,
+                        KeyCode::Char('e') => self.chip8.input = 6,
+                        KeyCode::Char('r') => self.chip8.input = 7,
+                        KeyCode::Char('a') => self.chip8.input = 8,
+                        KeyCode::Char('s') => self.chip8.input = 9,
+                        KeyCode::Char('d') => self.chip8.input = 10,
+                        KeyCode::Char('f') => self.chip8.input = 11,
+                        KeyCode::Char('z') => self.chip8.input = 12,
+                        KeyCode::Char('x') => self.chip8.input = 13,
+                        KeyCode::Char('c') => self.chip8.input = 14,
+                        KeyCode::Char('v') => self.chip8.input = 15,
                         _ => {}
                     }
                 }
@@ -88,21 +88,27 @@ impl App {
     }
 
     fn draw(&self, frame: &mut Frame) {
-        let horizontal =
-            Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]);
-        let vertical = Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]);
-        let [display, right] = horizontal.areas(frame.area());
-        let [n1, n2] = vertical.areas(right);
-
+        let horizontal = Layout::horizontal([Constraint::Length(66), Constraint::Min(1)]);
+        let left_vertical = Layout::vertical([Constraint::Length(18), Constraint::Min(1)]);
+        let right_vertical = Layout::vertical([Constraint::Min(1), Constraint::Min(1)]);
+        let [left, right] = horizontal.areas(frame.area());
+        let [n1, n2] = right_vertical.areas(right);
+        let [display, n3] = left_vertical.areas(left);
         let surrounding_block = Block::default().borders(Borders::ALL).title("data");
         frame.render_widget(self.display(), display);
-        frame.render_widget(Paragraph::new("n1").block(surrounding_block.clone()), n1);
-        frame.render_widget(Paragraph::new("n2").block(surrounding_block), n2);
+        frame.render_widget(
+            HexInput {
+                input: self.chip8.input,
+            },
+            n1,
+        );
+        frame.render_widget(Paragraph::new("n2").block(surrounding_block.clone()), n2);
+        frame.render_widget(Paragraph::new("n3").block(surrounding_block), n3);
     }
 
     fn display(&self) -> impl Widget + '_ {
         Canvas::default()
-            .block(Block::bordered().title("Rects"))
+            .block(Block::bordered().title("ROM"))
             .marker(Marker::HalfBlock)
             .paint(|ctx| {
                 ctx.draw(&self.chip8);
@@ -126,12 +132,5 @@ impl Shape for Chip8 {
                 '0' => painter.paint(i % WIDTH_PIX, i / WIDTH_PIX, Color::Black),
                 _ => panic!("unexpected display value"),
             });
-        //painter.paint(0, 0, Color::Green);
-        //painter.paint(31, 0, Color::Green);
-        //painter.paint(31, 1, Color::Green);
-        //
-        //painter.paint(63, 0, Color::Green);
-        //painter.paint(0, 31, Color::Green);
-        //painter.paint(63, 31, Color::Green);
     }
 }
