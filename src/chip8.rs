@@ -1,7 +1,9 @@
 #![allow(arithmetic_overflow)]
-use std::{fmt, fs::read};
+use std::fmt;
 
 use drawille::Canvas;
+
+use crate::rom::Rom;
 /// The first 512 bytes are resevered for the interpreter
 const PROGRAM_START: usize = 0x200;
 const MEMORY_SIZE: usize = 4096;
@@ -33,40 +35,54 @@ const CHARACTERS:[u8;5*16] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, //f
 ];
 
+enum Register {
+    Main(u8),
+    ProgramCounter,
+    Sprite,
+    Delay,
+    Sound,
+}
+
 /// Chip 8 emulator state
 #[derive(Clone, PartialEq)]
 pub struct Chip8 {
-    memory: [u8; MEMORY_SIZE],
-    registers: [u8; 16],
+    pub memory: [u8; MEMORY_SIZE],
+    pub registers: [u8; 16],
     /// register for storing memory addresses
-    i: u16,
+    pub i: u16,
     pub input: u8,
     /// these two registers are auto decremented at 60hz
-    delay: u8,
-    sound: u8,
+    pub delay: u8,
+    pub sound: u8,
 
-    program_counter: u16,
+    pub program_counter: u16,
     /// the stack stores the address that should be returned to
-    stack: [u16; 16],
-    stack_pointer: u8,
+    pub stack: [u16; 16],
+    pub stack_pointer: u8,
 
     pub display: [u8; WIDTH_BYTE * HEIGHT_BYTE],
+    pub rom: Rom,
     canvas: Canvas,
 }
 
+struct Instruction {
+    n1: u8,
+    n2: u8,
+    n3: u8,
+    n4: u8,
+}
+
+impl Instruction {
+    fn exec(self, state: &mut Chip8) {}
+    fn display(self, state: Chip8) {}
+}
 impl Chip8 {
     ///
-    pub fn new(rom_location: &str) -> Chip8 {
+    pub fn new(rom: Rom) -> Chip8 {
         let mut memory: [u8; MEMORY_SIZE] = [0; MEMORY_SIZE];
 
-        println!("Reading ROM: {}", rom_location);
-
-        let rom = match read(rom_location) {
-            Ok(rom) => rom,
-            Err(_) => [].to_vec(),
-        };
-        let rom: &[u8] = rom.as_slice();
-        memory[PROGRAM_START..PROGRAM_START + rom.len()].copy_from_slice(rom);
+        let rom_slice: &[u8] = rom.contents.as_slice();
+        memory[PROGRAM_START..PROGRAM_START + rom_slice.len()].copy_from_slice(rom_slice);
 
         memory[0..CHARACTERS.len()].copy_from_slice(&CHARACTERS);
 
@@ -81,6 +97,7 @@ impl Chip8 {
             stack: [0; 16],
             stack_pointer: 0,
             display: [0; WIDTH_BYTE * HEIGHT_BYTE],
+            rom,
             canvas: Canvas::new(WIDTH_PIX as u32, HEIGHT_PIX as u32),
         }
     }
@@ -250,6 +267,43 @@ impl Chip8 {
                 todo!("Not all opcodes implemented!")
             }
         }
+        //match (n1, n2, n3, n4) {
+        //    (0, 0, 0xE, 0x0) => self.op_00e0(),
+        //    (0, 0, 0xE, 0xE) => self.op_00ee(),
+        //    (0x1, n1, n2, n3) => self.op_1nnn(n1, n2, n3),
+        //    (0x2, n1, n2, n3) => self.op_2nnn(n1, n2, n3),
+        //    (0x3, x, k1, k2) => self.op_3xkk(x, k1, k2),
+        //    (0x4, x, k1, k2) => self.op_4xkk(x, k1, k2),
+        //    (0x5, x, y, _) => self.op_5xy(x, y),
+        //    (0x6, x, k1, k2) => self.op_6xkk(x, k1, k2),
+        //    (0x7, x, k1, k2) => self.op_7xkk(x, k1, k2),
+        //    (0x8, x, y, 0x0) => self.op_8xy0(x, y),
+        //    (0x8, x, y, 0x1) => self.op_8xy1(x, y),
+        //    (0x8, x, y, 0x2) => self.op_8xy2(x, y),
+        //    (0x8, x, y, 0x3) => self.op_8xy3(x, y),
+        //    (0x8, x, y, 0x4) => self.op_8xy4(x, y),
+        //    (0x8, x, y, 0x5) => self.op_8xy5(x, y),
+        //    (0x8, x, _, 0x6) => self.op_8xy6(x),
+        //    (0x8, x, y, 0x7) => self.op_8xy7(x, y),
+        //    (0x8, x, _, 0xE) => self.op_8xyE(x),
+        //    (0x9, x, y, 0x0) => self.op_9xy0(x, y),
+        //    (0xA, n1, n2, n3) => self.op_Annn(n1, n2, n3),
+        //    (0xB, n1, n2, n3) => self.op_Bnnn(n1, n2, n3),
+        //    (0xC, x, n1, n2) => self.op_Cxnn(x, n1, n2),
+        //    (0xD, x, y, n) => self.op_Dxyn(x, y, n),
+        //    (0xE, x, 0x9, 0xE) => self.opEx9E(x),
+        //    (0xE, x, 0xA, 0x1) => self.opExA1(x),
+        //    (0xF, x, 0x0, 0x7) => self.opFx07(x),
+        //    (0xF, x, 0x0, 0xA) => self.opFx0A(x),
+        //    (0xF, x, 0x1, 0x5) => self.opFx15(x),
+        //    (0xF, x, 0x1, 0x8) => self.opFx18(x),
+        //    (0xF, x, 0x1, 0xE) => self.opFx1E(x),
+        //    (0xF, x, 0x2, 0x9) => self.opFx29(x),
+        //    (0xF, x, 0x3, 0x3) => self.opFx33(x),
+        //    (0xF, x, 0x5, 0x5) => self.opFx55(x),
+        //    (0xF, x, 0x6, 0x5) => self.opFx65(x),
+        //    _ => todo!(),
+        //}
         //each instruction is 2 bytes
         self.program_counter += 2;
         if self.delay > 0 {
@@ -260,6 +314,141 @@ impl Chip8 {
         }
         //self.input = 0;
         self
+    }
+
+    fn op_00e0(&self) {
+        todo!()
+    }
+
+    fn op_00ee(&self) {
+        todo!()
+    }
+
+    fn op_1nnn(&self, n1: u8, n2: u8, n3: u8) {
+        todo!()
+    }
+
+    fn op_2nnn(&self, n1: u8, n2: u8, n3: u8) {
+        todo!()
+    }
+
+    fn op_3xkk(&self, x: u8, k1: u8, k2: u8) {
+        todo!()
+    }
+
+    fn op_4xkk(&self, x: u8, k1: u8, k2: u8) {
+        todo!()
+    }
+
+    fn op_5xy(&self, x: u8, y: u8) {
+        todo!()
+    }
+
+    fn op_6xkk(&self, x: u8, k1: u8, k2: u8) {
+        todo!()
+    }
+
+    fn op_7xkk(&self, x: u8, k1: u8, k2: u8) {
+        todo!()
+    }
+
+    fn op_8xy0(&self, x: u8, y: u8) {
+        todo!()
+    }
+
+    fn op_8xy1(&self, x: u8, y: u8) {
+        todo!()
+    }
+
+    fn op_8xy2(&self, x: u8, y: u8) {
+        todo!()
+    }
+
+    fn op_8xy3(&self, x: u8, y: u8) {
+        todo!()
+    }
+
+    fn op_8xy4(&self, x: u8, y: u8) {
+        todo!()
+    }
+
+    fn op_8xy5(&self, x: u8, y: u8) {
+        todo!()
+    }
+    fn op_8xy6(&self, x: u8) {
+        todo!()
+    }
+
+    fn op_8xy7(&self, x: u8, y: u8) {
+        todo!()
+    }
+
+    fn op_8xyE(&self, x: u8) {
+        todo!()
+    }
+
+    fn op_9xy0(&self, x: u8, y: u8) {
+        todo!()
+    }
+
+    fn op_Annn(&self, n1: u8, n2: u8, n3: u8) {
+        todo!()
+    }
+
+    fn op_Bnnn(&self, n1: u8, n2: u8, n3: u8) {
+        todo!()
+    }
+
+    fn op_Cxnn(&self, x: u8, n1: u8, n2: u8) {
+        todo!()
+    }
+
+    fn op_Dxyn(&self, x: u8, y: u8, n2: u8) {
+        todo!()
+    }
+
+    fn opEx9E(&self, x: u8) {
+        todo!()
+    }
+
+    fn opExA1(&self, x: u8) {
+        todo!()
+    }
+
+    fn opFx07(&self, x: u8) {
+        todo!()
+    }
+
+    fn opFx0A(&self, x: u8) {
+        todo!()
+    }
+
+    fn opFx15(&self, x: u8) {
+        todo!()
+    }
+
+    fn opFx18(&self, x: u8) {
+        todo!()
+    }
+
+    fn opFx1E(&self, x: u8) {
+        todo!()
+    }
+
+    fn opFx29(&self, x: u8) {
+        todo!()
+    }
+
+    fn opFx33(&self, x: u8) {
+        todo!()
+    }
+
+    fn opFx55(&self, x: u8) {
+        todo!()
+    }
+
+    fn opFx65(&self, x: u8) {
+        todo!()
     }
 }
 
